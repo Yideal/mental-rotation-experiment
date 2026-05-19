@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理旋转实验</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            color: #000000;
+            margin-bottom: 20px;
+        }
+        
+        h2 {
+            font-size: 1.5em;
+            color: #333333;
+            margin-bottom: 20px;
+        }
+        
+        p {
+            font-size: 1.2em;
+            color: #666666;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        .instructions {
+            text-align: left;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 10px;
+        }
+        
+        .instructions p {
+            margin-bottom: 10px;
+        }
+        
+        .key-hint {
+            display: inline-block;
+            padding: 5px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+        
+        .key-hint.error {
+            background-color: #f44336;
+        }
+        
+        input[type="text"] {
+            font-size: 1.2em;
+            padding: 10px 20px;
+            margin: 10px 0;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            min-width: 200px;
+            text-align: center;
+        }
+        
+        button {
+            font-size: 1.2em;
+            padding: 15px 40px;
+            margin-top: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #stimulus {
+            font-size: 48px;
+            color: #000000;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+        }
+        
+        #fixation {
+            font-size: 32px;
+            color: #000000;
+        }
+        
+        .feedback {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        
+        .feedback.correct {
+            color: #4CAF50;
+        }
+        
+        .feedback.error {
+            color: #f44336;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            max-width: 400px;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 10px;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            font-size: 1em;
+            color: #333;
+            margin-top: 10px;
+        }
+        
+        .countdown {
+            font-size: 4em;
+            font-weight: bold;
+            color: #333;
+            margin-top: 20px;
+        }
+        
+        .encouragement {
+            font-size: 1.2em;
+            color: #666;
+            margin-top: 20px;
+            font-style: italic;
+        }
+        
+        .results {
+            margin-top: 30px;
+        }
+        
+        .results p {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+        
+        .highlight {
+            font-weight: bold;
+            color: #4CAF50;
+            font-size: 1.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="welcome-page">
+        <h1>心理旋转实验</h1>
+        <p>本实验是认知心理学经典实验复现，预计耗时约10分钟</p>
+        <label for="subject-id">被试编号：</label>
+        <input type="text" id="subject-id" value="S001" required>
+        <br>
+        <button onclick="startExperiment()">开始实验</button>
+    </div>
+
+    <div class="container" id="instruction-page" style="display: none;">
+        <h1>指导语</h1>
+        <div class="instructions">
+            <p>欢迎参加本次实验！</p>
+            <p>你将看到不同方向的字母R。请忽略倾斜角度，快速判断它是正写还是反写Я。</p>
+            <p>- 正写R按 <span class="key-hint">F键</span></p>
+            <p>- 反写R按 <span class="key-hint">J键</span></p>
+            <p>请在保证正确率的前提下尽可能快地反应。</p>
+            <p>实验分为两部分，中间可以休息2分钟。</p>
+            <p>每道题只有一次作答机会，作答后即刻记录结果，不可修改。</p>
+        </div>
+        <button onclick="startPractice()">开始练习</button>
+    </div>
+
+    <div class="container" id="experiment-page" style="display: none;">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-text" id="progress-text"></div>
+        <div id="stimulus-area" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+            <div id="fixation" style="display: none;">+</div>
+            <div id="stimulus" style="display: none;"></div>
+            <div id="feedback" class="feedback" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="container" id="break-page" style="display: none;">
+        <h1 id="break-title"></h1>
+        <div class="countdown" id="countdown"></div>
+        <div class="encouragement" id="encouragement"></div>
+        <button id="continue-btn" style="display: none;" onclick="continueExperiment()">继续实验</button>
+    </div>
+
+    <div class="container" id="results-page" style="display: none;">
+        <h1>实验完成！感谢你的参与</h1>
+        <div class="results">
+            <p>被试编号：<span class="highlight" id="result-subject"></span></p>
+            <p>平均反应时：<span class="highlight" id="result-rt"></span> ms</p>
+            <p>总正确率：<span class="highlight" id="result-accuracy"></span> %</p>
+        </div>
+        <button onclick="downloadData()">下载实验数据</button>
+    </div>
+
+    <script>
+        // 实验配置参数
+        const CONFIG = {
+            rotations: [0, 60, 120, 180, 240, 300],
+            charTypes: ['normal', 'mirror'],
+            practiceTrialsPerCondition: 2,
+            mainTrialsPerCondition: 20,
+            fixationDuration: 500,
+            timeoutDuration: 5000,
+            feedbackCorrectDuration: 500,
+            feedbackErrorDuration: 1000,
+            interTrialInterval: 1000,
+            breakDuration: 120, // 2分钟中途休息
+            practiceBreakDuration: 3 // 3秒练习后休息
+        };
+
+        // 实验状态
+        let experimentState = {
+            subjectId: '',
+            currentBlock: 0, // 0=练习, 1=正式实验
+            currentTrial: 0,
+            trials: [],
+            data: [],
+            startTime: null,
+            trialStartTime: null,
+            timeoutTimer: null,
+            currentStimulus: null,
+            halfwayBreakDone: false // 是否已完成中途休息
+        };
+
+        // 打乱数组
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // 生成试次列表
+        function generateTrials(isPractice) {
+            const trials = [];
+            const repetitions = isPractice ? CONFIG.practiceTrialsPerCondition : CONFIG.mainTrialsPerCondition;
+            
+            CONFIG.rotations.forEach(angle => {
+                CONFIG.charTypes.forEach(charType => {
+                    for (let i = 0; i < repetitions; i++) {
+                        trials.push({
+                            angle: angle,
+                            charType: charType
+                        });
+                    }
+                });
+            });
+            
+            return shuffleArray(trials);
+        }
+
+        // 开始实验
+        function startExperiment() {
+            const subjectId = document.getElementById('subject-id').value.trim();
+            if (!subjectId) {
+                alert('请输入被试编号');
+                return;
+            }
+            
+            experimentState.subjectId = subjectId;
+            hideAllPages();
+            document.getElementById('instruction-page').style.display = 'block';
+        }
+
+        // 开始练习
+        function startPractice() {
+            hideAllPages();
+            document.getElementById('experiment-page').style.display = 'block';
+            
+            experimentState.currentBlock = 0;
+            experimentState.currentTrial = 0;
+            experimentState.trials = generateTrials(true);
+            experimentState.data = [];
+            experimentState.halfwayBreakDone = false;
+            
+            startNextTrial();
+        }
+
+        // 开始正式实验block
+        function startMainBlock(blockNumber) {
+            hideAllPages();
+            document.getElementById('experiment-page').style.display = 'block';
+            
+            experimentState.currentBlock = blockNumber;
+            experimentState.currentTrial = 0;
+            experimentState.trials = generateTrials(false);
+            experimentState.halfwayBreakDone = false;
+            
+            startNextTrial();
+        }
+
+        // 开始下一个试次
+        function startNextTrial() {
+            // 检查中途休息点：正式实验进行到120次时（进度50%）
+            if (experimentState.currentBlock === 1 && 
+                !experimentState.halfwayBreakDone && 
+                experimentState.currentTrial === 120) { // 完成120次后休息（240次的一半）
+                experimentState.halfwayBreakDone = true;
+                showHalfwayBreak();
+                return;
+            }
+            
+            if (experimentState.currentTrial >= experimentState.trials.length) {
+                finishBlock();
+                return;
+            }
+            
+            const trial = experimentState.trials[experimentState.currentTrial];
+            experimentState.currentStimulus = trial;
+            experimentState.trialStartTime = performance.now();
+            
+            // 更新进度条
+            updateProgress();
+            
+            // 显示注视点
+            showFixation();
+        }
+
+        // 更新进度条
+        function updateProgress() {
+            const totalTrials = experimentState.trials.length;
+            const currentTrial = experimentState.currentTrial + 1;
+            const percentage = Math.round((currentTrial / totalTrials) * 100);
+            
+            document.getElementById('progress-fill').style.width = percentage + '%';
+            
+            let blockName = '';
+            if (experimentState.currentBlock === 0) {
+                blockName = '练习阶段';
+            } else {
+                blockName = '正式实验';
+            }
+            
+            document.getElementById('progress-text').textContent = 
+                `${blockName}: ${currentTrial} / ${totalTrials} (${percentage}%)`;
+        }
+
+        // 显示注视点
+        function showFixation() {
+            document.getElementById('fixation').style.display = 'block';
+            document.getElementById('stimulus').style.display = 'none';
+            document.getElementById('feedback').style.display = 'none';
+            
+            setTimeout(() => {
+                showStimulus();
+            }, CONFIG.fixationDuration);
+        }
+
+        // 显示刺激
+        function showStimulus() {
+            document.getElementById('fixation').style.display = 'none';
+            document.getElementById('stimulus').style.display = 'block';
+            
+            const trial = experimentState.currentStimulus;
+            const svg = d3.select('#stimulus')
+                .html('')
+                .append('svg')
+                .attr('width', 150)
+                .attr('height', 150)
+                .attr('viewBox', '-75 -75 150 150');
+            
+            // 创建字符组
+            const g = svg.append('g');
+            
+            // 应用镜像和旋转变换
+            let transform = '';
+            if (trial.charType === 'mirror') {
+                transform += 'scale(-1, 1) ';
+            }
+            transform += `rotate(${trial.angle})`;
+            
+            g.attr('transform', transform);
+            
+            // 添加文本
+            g.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'middle')
+                .attr('font-family', 'Arial, sans-serif')
+                .attr('font-size', '48px')
+                .attr('font-weight', 'bold')
+                .attr('fill', '#000000')
+                .text('R');
+            
+            // 设置超时
+            experimentState.timeoutTimer = setTimeout(() => {
+                handleTimeout();
+            }, CONFIG.timeoutDuration);
+        }
+
+        // 处理超时
+        function handleTimeout() {
+            clearTimeout(experimentState.timeoutTimer);
+            
+            const rt = CONFIG.timeoutDuration;
+            const correct = 0;
+            
+            recordData(rt, correct);
+            
+            document.getElementById('stimulus').style.display = 'none';
+            
+            if (experimentState.currentBlock === 0) {
+                // 练习阶段显示反馈
+                document.getElementById('feedback').textContent = '超时，请更快反应';
+                document.getElementById('feedback').className = 'feedback error';
+                document.getElementById('feedback').style.display = 'block';
+                
+                setTimeout(() => {
+                    nextTrial();
+                }, CONFIG.feedbackErrorDuration);
+            } else {
+                // 正式实验只显示空屏
+                setTimeout(() => {
+                    nextTrial();
+                }, CONFIG.interTrialInterval);
+            }
+        }
+
+        // 处理按键反应
+        function handleKeyPress(event) {
+            if (document.getElementById('experiment-page').style.display !== 'block') {
+                return;
+            }
+            
+            const key = event.key.toLowerCase();
+            if (key !== 'f' && key !== 'j') {
+                return;
+            }
+            
+            clearTimeout(experimentState.timeoutTimer);
+            
+            const rt = Math.round(performance.now() - experimentState.trialStartTime);
+            const trial = experimentState.currentStimulus;
+            
+            // 判断正确性
+            const expectedKey = trial.charType === 'normal' ? 'f' : 'j';
+            const correct = key === expectedKey ? 1 : 0;
+            
+            recordData(rt, correct);
+            
+            document.getElementById('stimulus').style.display = 'none';
+            
+            if (experimentState.currentBlock === 0) {
+                // 练习阶段显示反馈
+                if (correct === 1) {
+                    document.getElementById('feedback').textContent = '正确';
+                    document.getElementById('feedback').className = 'feedback correct';
+                    document.getElementById('feedback').style.display = 'block';
+                    setTimeout(() => {
+                        nextTrial();
+                    }, CONFIG.feedbackCorrectDuration);
+                } else {
+                    document.getElementById('feedback').textContent = '错误';
+                    document.getElementById('feedback').className = 'feedback error';
+                    document.getElementById('feedback').style.display = 'block';
+                    setTimeout(() => {
+                        nextTrial();
+                    }, CONFIG.feedbackErrorDuration);
+                }
+            } else {
+                // 正式实验只显示空屏
+                setTimeout(() => {
+                    nextTrial();
+                }, CONFIG.interTrialInterval);
+            }
+        }
+
+        // 记录数据
+        function recordData(rt, correct) {
+            const trial = experimentState.currentStimulus;
+            experimentState.data.push({
+                subject_id: experimentState.subjectId,
+                block: experimentState.currentBlock,
+                trial_id: experimentState.currentTrial + 1,
+                angle: trial.angle,
+                char_type: trial.charType,
+                rt: rt,
+                correct: correct,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // 进入下一个试次
+        function nextTrial() {
+            document.getElementById('feedback').style.display = 'none';
+            experimentState.currentTrial++;
+            startNextTrial();
+        }
+
+        // 中途休息（正式实验进行到120次时）
+        function showHalfwayBreak() {
+            hideAllPages();
+            showBreakPage('已完成一半，请休息 2 分钟', CONFIG.breakDuration, false);
+        }
+
+        // 完成当前block
+        function finishBlock() {
+            hideAllPages();
+            
+            if (experimentState.currentBlock === 0) {
+                // 练习结束，显示短暂休息后进入正式实验
+                showBreakPage('练习结束，即将开始正式实验', CONFIG.practiceBreakDuration, true);
+            } else {
+                // 正式实验结束，显示结果
+                showResults();
+            }
+        }
+
+        // 隐藏所有页面
+        function hideAllPages() {
+            document.getElementById('welcome-page').style.display = 'none';
+            document.getElementById('instruction-page').style.display = 'none';
+            document.getElementById('experiment-page').style.display = 'none';
+            document.getElementById('break-page').style.display = 'none';
+            document.getElementById('results-page').style.display = 'none';
+        }
+
+        // 显示休息页面
+        function showBreakPage(title, duration, autoContinue) {
+            hideAllPages();
+            document.getElementById('break-title').textContent = title;
+            document.getElementById('countdown').textContent = duration;
+            document.getElementById('break-page').style.display = 'block';
+            
+            // 长时间休息显示继续按钮
+            if (duration >= 60) {
+                document.getElementById('continue-btn').style.display = 'inline-block';
+            } else {
+                document.getElementById('continue-btn').style.display = 'none';
+            }
+            
+            // 显示鼓励语
+            document.getElementById('encouragement').textContent = '休息一下，保持专注！';
+            
+            let timeLeft = duration;
+            const countdownTimer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('countdown').textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownTimer);
+                    continueExperiment();
+                }
+            }, 1000);
+        }
+
+        // 继续实验
+        function continueExperiment() {
+            hideAllPages();
+            
+            if (experimentState.currentBlock === 0) {
+                // 从练习进入正式实验
+                startMainBlock(1);
+            } else {
+                // 从中途休息继续，直接回到实验页面继续答题
+                document.getElementById('experiment-page').style.display = 'block';
+                startNextTrial();
+            }
+        }
+
+        // 显示结果页面
+        function showResults() {
+            hideAllPages();
+            document.getElementById('results-page').style.display = 'block';
+            
+            // 计算平均反应时和正确率（排除异常值）
+            const validData = experimentState.data.filter(d => d.block > 0 && d.rt >= 200 && d.rt <= 3000);
+            const totalValidTrials = validData.length;
+            const correctTrials = validData.filter(d => d.correct === 1).length;
+            const avgRT = totalValidTrials > 0 ? 
+                Math.round(validData.reduce((sum, d) => sum + d.rt, 0) / totalValidTrials) : 0;
+            const accuracy = totalValidTrials > 0 ? 
+                Math.round((correctTrials / totalValidTrials) * 100) : 0;
+            
+            document.getElementById('result-subject').textContent = experimentState.subjectId;
+            document.getElementById('result-rt').textContent = avgRT;
+            document.getElementById('result-accuracy').textContent = accuracy;
+        }
+
+        // 下载数据
+        function downloadData() {
+            // 数据清洗：标记异常值
+            const cleanedData = experimentState.data.map(d => ({
+                ...d,
+                is_outlier: d.rt < 200 || d.rt > 3000 ? 1 : 0
+            }));
+            
+            // 生成CSV
+            const headers = ['subject_id', 'block', 'trial_id', 'angle', 'char_type', 'rt', 'correct', 'timestamp', 'is_outlier'];
+            const rows = cleanedData.map(d => headers.map(h => d[h]).join(','));
+            const csvContent = [headers.join(','), ...rows].join('\n');
+            
+            // 创建下载链接
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-');
+            const fileName = `mental_rotation_${experimentState.subjectId}_${timestamp}.csv`;
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 键盘事件监听
+        document.addEventListener('keydown', handleKeyPress);
+
+        // 防止刷新和后退
+        window.addEventListener('beforeunload', (e) => {
+            if (experimentState.currentBlock > 0 || 
+                (experimentState.currentBlock === 0 && experimentState.currentTrial > 0)) {
+                e.preventDefault();
+                e.returnValue = '实验尚未完成，确定要离开吗？';
+                return e.returnValue;
+            }
+        });
+    </script>
+</body>
+</html>
